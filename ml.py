@@ -1,8 +1,10 @@
 import jetson.inference
 import jetson.utils
+import json
 from jtop import jtop
 import numpy as np
 import os
+import pandas as pd
 from PIL import Image
 import sys
 import time
@@ -11,12 +13,13 @@ from torchvision import transforms, models
 
 
 def get_image(image, width, height):
-    # Image transformations
+    '''# Image transformations
     trans = transforms.Compose([
         transforms.ToTensor()
     ])
     # Transform image
-    image = trans(image)
+    image = trans(image)'''
+    image = torch.rand(3, 4304, 4304)
     # Split image into tiles
     tiles = tile(image, width, height)
     del image
@@ -56,14 +59,6 @@ def load_model(model_path):
     # Return model
     return model
 
-def load_model2(model_path):
-    model = torch.hub.load(
-        "ultralytics/yolov5",
-        "yolov5s",
-        pretrained=True    
-    )
-    return model
-
 
 def heat_check(jetson, max_temp):
     """
@@ -75,6 +70,7 @@ def heat_check(jetson, max_temp):
     if  jetson.stats["Temp AO"] >= max_temp or \
         jetson.stats["Temp CPU"] >= max_temp or \
         jetson.stats["Temp GPU"] >= max_temp or \
+        jetson.stats["Temp PLL"] >= max_temp or \
         jetson.stats["Temp thermal"] >= max_temp:
         # Take a 60 sec. pause
         print("Nano is too hot, taking a 1 minute pause")
@@ -144,10 +140,9 @@ if __name__ == "__main__":
             batch = get_image(image, tile_width, tile_height)
             del image
             print(batch.shape)
-            # Send to GPU
-            #batch = batch.cuda()
             # Flatten patches
             batch = batch.contiguous().view((batch.size(0) * batch.size(1)), batch.size(2), batch.size(3), batch.size(4))
+            # Send to GPU
             batch = batch.cuda()
             # Loop all tiles
             count = 1
@@ -156,6 +151,7 @@ if __name__ == "__main__":
                 # Prediction
                 #prediction = model(image.unsqueeze(0).cuda())
                 prediction = model(image.unsqueeze(0))
+                #torch.save(prediction[0], "./results/" + str(time.time()) + "_" + str(count) + ".pth")
                 count += 1
             del batch
             # Save Prediction
@@ -166,3 +162,5 @@ if __name__ == "__main__":
         # Set current time
         end_time = time.time()
         #print(end_time - start_time)
+
+    print("Done !")

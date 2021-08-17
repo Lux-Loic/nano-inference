@@ -25,7 +25,6 @@ if __name__ == "__main__":
             writer.writerow(stats)
             # Start loop
             while jetson.ok() and (time.time() - start_time) < EXECUTION_TIME:
-                print(time.time() - start_time)
                 time.sleep(LOGGING_TIME)
                 stats = jetson.stats
                 # Write row

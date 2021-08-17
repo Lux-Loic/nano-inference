@@ -12,16 +12,25 @@ if __name__ == "__main__":
     # ----------------------------------------
     # Load Results
     # ----------------------------------------
-    results_path = "stats.csv"
-    df = pd.read_csv(results_path)
+    csv_path = "stats.csv"
+    df = pd.read_csv(csv_path)
 
     # ----------------------------------------
     # Save Results
     # ----------------------------------------
-    plots_path = "./results/plots"
+    results_path = "./results"
+    # Create results folder if it doesn't exist
+
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+
+    plots_path = os.path.join(results_path, "./plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
 
+    # ----------------------------------------
+    # Plots
+    # ----------------------------------------
     # CPUs
     CPU1 = df["CPU1"]
     fig, ax = plt.subplots(nrows=1, ncols=1)
@@ -137,3 +146,41 @@ if __name__ == "__main__":
     ax.plot(np.arange(len(power_avg)), power_avg)
     fig.savefig(plots_path + '/power_avg.png')
     plt.close(fig)
+
+    # ----------------------------------------
+    # Mean stats
+    # ----------------------------------------
+    numerical_df = df[[
+        "CPU1",
+        "CPU2",
+        "CPU3",
+        "CPU4",
+        "GPU",
+        "RAM",
+        "EMC",
+        "IRAM",
+        "SWAP",
+        "APE",
+        "Temp AO",
+        "Temp CPU",
+        "Temp GPU",
+        "Temp PLL",
+        "Temp thermal",
+        "power cur",
+        "power avg"
+    ]]
+    means_df = numerical_df.mean(axis = 0)
+    means_df.to_csv(os.path.join(results_path, "mean.csv"), sep=',')
+
+
+
+
+
+
+
+
+
+
+
+
+
