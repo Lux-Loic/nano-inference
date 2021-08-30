@@ -3,15 +3,23 @@ model:
         path: "./models/model.pth"
     onnx:
         path: "./models/model.onnx"
+
 images:
     type: ".bmp"
     tile:
         width: 538
         height: 538
+
 inference:
     execution_time: 3600 # Running time of experiment (seconds)
     max_temperature: 100 # Celcius
     intervals: 60 # Analysis every X seconds
+
 results:
     path: "./results" # Where results will be saved
+
+ftp:
+    host: "10.3.141.1"
+    username: "pi"
+    password: "LuxPi!"
 
