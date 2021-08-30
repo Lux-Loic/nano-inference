@@ -2,6 +2,7 @@ import jetson.inference
 import jetson.utils
 import json
 from jtop import jtop
+import logging
 import numpy as np
 import os
 import pandas as pd
@@ -10,16 +11,22 @@ import sys
 import time
 import torch
 from torchvision import transforms, models
+import yaml
+
+
+def load_config(config_path):
+    config = yaml.safe_load(open(config_path))
+    return config
 
 
 def get_image(image, width, height):
-    '''# Image transformations
+    # Image transformations
     trans = transforms.Compose([
         transforms.ToTensor()
     ])
     # Transform image
-    image = trans(image)'''
-    image = torch.rand(3, 4304, 4304)
+    image = trans(image)
+    #image = torch.rand(3, 4304, 4304)
     # Split image into tiles
     tiles = tile(image, width, height)
     del image
@@ -60,6 +67,23 @@ def load_model(model_path):
     return model
 
 
+def load_logger(logger_path):
+    # create logger with 'spam_application'
+    logger = logging.getLogger('Lux')
+    logger.setLevel(logging.DEBUG)
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(logger_path)
+    fh.setLevel(logging.DEBUG)
+
+    # create formatter and add it to the handlers
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    # add the handlers to the logger
+    logger.addHandler(fh)
+    return logger
+
+
+
 def heat_check(jetson, max_temp):
     """
     Checks if the Nano is getting too hot. If temperature reaches
@@ -76,6 +100,7 @@ def heat_check(jetson, max_temp):
         print("Nano is too hot, taking a 1 minute pause")
         time.sleep(60)
 
+logger = load_logger("logs.log")
 
 if __name__ == "__main__":
     args = sys.argv[1:]
@@ -85,46 +110,61 @@ if __name__ == "__main__":
             sys.exit("Invalid image folder path")
     else:
         sys.exit("Invalid image folder path")
+        
+    # ----------------------------------------
+    # Configuration
+    # ----------------------------------------
+    config = load_config("./config.yml")    
+
+    # ----------------------------------------
+    # Results
+    # ----------------------------------------
+    # Create results folder if it doesn't exist
+
+    if not os.path.exists(config["results"]["path"]):
+        os.makedirs(config["results"]["path"])
+
+    plots_path = os.path.join(config["results"]["path"], "./predictions")
+    if not os.path.exists(plots_path):
+        os.makedirs(plots_path)    
 
     jetson = jtop()
     jetson.start()
 
     print("----- Lux Ship Detection -----")
-    # Clear Memory
-    torch.cuda.empty_cache()
-    # Paths
-    model_path = "./models/ssdlite320_mobilenet_v3_large.pth"
-    #model_path = "./models/shufflenet.pth"
 
     # Tiling
-    tile_width = 269
-    tile_height = 269
+    tile_width = config["images"]["tile"]["width"]
+    tile_height = config["images"]["tile"]["height"]
 
     # Load model
     print("Loading model...")
-    model = load_model(model_path)
+    logger.info("Loading model...")
+    model = load_model(config["model"]["torch"]["path"])
     # Send model to device
     model.eval().cuda()
     print("Model Loaded")
+    logger.info("Model Loaded")
+    
+    # Clear Memory
+    torch.cuda.empty_cache()
 
     # Keep track of time
     initial_time = time.time()
     start_time = time.time()
     end_time = time.time()
-    execution_time = 3600 # 1 hour
-    analysis_time = 60 # 1 minute
-    MAX_TEMP = 100
     running = True
 
     print("Start Analyzing")
+    logger.info("Start Analyzing")
     while running:
         # If Nano gets too hot
-        heat_check(jetson, MAX_TEMP)
+        heat_check(jetson, config["inference"]["max_temperature"])
         # For analysis purpose, remove in production
-        # Limits execution time to 'execution_time' seconds
-        if (time.time() - initial_time) > execution_time:
+        # Limits execution time
+        if (time.time() - initial_time) > config["inference"]["execution_time"]:
             running = False
-        if (end_time - start_time) >= analysis_time:
+        if (end_time - start_time) >= config["inference"]["intervals"]:
             # Clear Memory
             torch.cuda.empty_cache()
             # Retrieve files
@@ -133,13 +173,12 @@ if __name__ == "__main__":
             file_path = files[-1]
             del files
             print("Analyzing " + file_path)
+            logger.info("Analyzing " + file_path)
             # Read image
             image = Image.open(file_path).convert('RGB')
-            del file_path
             # Get image
             batch = get_image(image, tile_width, tile_height)
             del image
-            print(batch.shape)
             # Flatten patches
             batch = batch.contiguous().view((batch.size(0) * batch.size(1)), batch.size(2), batch.size(3), batch.size(4))
             # Send to GPU
@@ -151,16 +190,25 @@ if __name__ == "__main__":
                 # Prediction
                 #prediction = model(image.unsqueeze(0).cuda())
                 prediction = model(image.unsqueeze(0))
-                #torch.save(prediction[0], "./results/" + str(time.time()) + "_" + str(count) + ".pth")
+                file_name = file_path.split('/')[-1].replace(config["images"]["type"], f"_{count}.pth")
+                torch.save(prediction[0], config["results"]["path"] + "/predictions/" + file_name)
+                # Clear Memory
+                del prediction
+                del file_name
+                torch.cuda.empty_cache()
+                # Increment count
                 count += 1
+            # Clear Memory
             del batch
+            del count
+            del file_path
             # Save Prediction
-            print("Prediction saved")
+            print("Predictions saved")
+            logger.info("Predictions saved")
             # Reset timer
             start_time = time.time()
 
         # Set current time
         end_time = time.time()
-        #print(end_time - start_time)
 
     print("Done !")

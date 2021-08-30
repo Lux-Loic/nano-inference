@@ -1,20 +1,17 @@
 # ----------------------------------------
 # Imports
 # ----------------------------------------
+import csv
+import json
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd 
 from PIL import Image
-import matplotlib.pyplot as plt
+import sys
  
 
 if __name__ == "__main__":
-    # ----------------------------------------
-    # Load Results
-    # ----------------------------------------
-    csv_path = "stats.csv"
-    df = pd.read_csv(csv_path)
-
     # ----------------------------------------
     # Save Results
     # ----------------------------------------
@@ -27,6 +24,19 @@ if __name__ == "__main__":
     plots_path = os.path.join(results_path, "./plots")
     if not os.path.exists(plots_path):
         os.makedirs(plots_path)
+
+    # ----------------------------------------
+    # CSV
+    # ----------------------------------------
+    logs = open('stats.log', 'r')
+    lines = logs.read().splitlines()
+    logs.close()
+    rows = []
+
+    for line in lines:
+        rows.append(json.loads(line.replace("\'", "\"")))
+        
+    df = pd.DataFrame(rows)
 
     # ----------------------------------------
     # Plots
