@@ -201,7 +201,7 @@ if __name__ == "__main__":
         # Limits execution time
         if (time.time() - initial_time) > config["inference"]["execution_time"]:
             running = False
-        if (end_time - start_time) >= config["inference"]["execution_time"]:
+        if (end_time - start_time) >= config["inference"]["intervals"]:
             # Clear Memory
             torch.cuda.empty_cache()
             # Retrieve files
@@ -221,7 +221,6 @@ if __name__ == "__main__":
                 image = Image.open(flo).convert("RGB")
                 ftp.quit()
                 del ftp
-                del file_path
                 del flo
                 # Get image
                 batch = get_image(
