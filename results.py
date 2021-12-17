@@ -6,7 +6,8 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pandas as pd 
+import pandas as pd
+from pandas.api.types import is_numeric_dtype
 from PIL import Image
 import sys
  
@@ -35,45 +36,48 @@ if __name__ == "__main__":
 
     for line in lines:
         rows.append(json.loads(line.replace("\'", "\"")))
-        
+
     df = pd.DataFrame(rows)
+
+
+    # ----------------------------------------
+    # Column stats
+    # ----------------------------------------
+    stats = {}
+    for column in df:
+        try:
+            is_num = is_numeric_dtype(df[column][0])
+            if is_num:
+                stats[column] = {
+                    "max": max(df[column]),
+                    "min": min(df[column]),
+                    "mean": np.mean(df[column]),
+                    "median": np.median(df[column])
+                }
+        except:
+            pass
+
+    with open(os.path.join(results_path, "stats.json"), "w") as outfile:
+        json.dump(stats, outfile)
 
     # ----------------------------------------
     # Plots
     # ----------------------------------------
     # CPUs
-    CPU1 = df["CPU1"]
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('CPU1')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('CPU Usage (%)')
-    ax.plot(np.arange(len(CPU1)), CPU1)
-    fig.savefig(plots_path + '/CPU1.png')
-    plt.close(fig)
-    CPU2 = df["CPU2"]
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('CPU2')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('CPU2 Usage (%)')
-    ax.plot(np.arange(len(CPU2)), CPU2)
-    fig.savefig(plots_path + '/CPU2.png')
-    plt.close(fig)
-    CPU3 = df["CPU3"]
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('CPU3')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('CPU3 Usage (%)')
-    ax.plot(np.arange(len(CPU3)), CPU3)
-    fig.savefig(plots_path + '/CPU3.png')
-    plt.close(fig)
-    CPU4 = df["CPU4"]
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('CPU4')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('CPU4 Usage (%)')
-    ax.plot(np.arange(len(CPU4)), CPU4)
-    fig.savefig(plots_path + '/CPU4.png')
-    plt.close(fig)
+    for i in range(6):
+        key = f"CPU{i + 1}"
+        try:
+            if key in df and is_numeric_dtype(df[key][0]):
+                CPU = df[key]
+                fig, ax = plt.subplots(nrows=1, ncols=1)
+                ax.set_title(key)
+                ax.set_xlabel('Time')
+                ax.set_ylabel('CPU Usage (%)')
+                ax.plot(np.arange(len(CPU)), CPU)
+                fig.savefig(plots_path + f"/{key}.png")
+                plt.close(fig)
+        except:
+            pass
 
     # GPU
     GPU = df["GPU"]
@@ -96,46 +100,19 @@ if __name__ == "__main__":
     plt.close(fig)
 
     # Temperatures
-    temp_ao = df["Temp AO"]
-    temp_cpu = df["Temp CPU"]
-    temp_gpu = df["Temp GPU"]
-    temp_pll = df["Temp PLL"]
-    temp_thermal = df["Temp thermal"]
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('AO Temperature')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Temperature (Celcius)')
-    ax.plot(np.arange(len(temp_ao)), temp_ao)
-    fig.savefig(plots_path + '/temp_ao.png')
-    plt.close(fig)
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('CPU Temperature')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Temperature (Celcius)')
-    ax.plot(np.arange(len(temp_cpu)), temp_cpu)
-    fig.savefig(plots_path + '/temp_cpu.png')
-    plt.close(fig)
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('GPU Temperature')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Temperature (Celcius)')
-    ax.plot(np.arange(len(temp_gpu)), temp_gpu)
-    fig.savefig(plots_path + '/temp_gpu.png')
-    plt.close(fig)
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('PLL Temperature')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Temperature (Celcius)')
-    ax.plot(np.arange(len(temp_pll)), temp_pll)
-    fig.savefig(plots_path + '/temp_pll.png')
-    plt.close(fig)
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    ax.set_title('Thermal Temperature')
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Temperature (Celcius)')
-    ax.plot(np.arange(len(temp_thermal)), temp_thermal)
-    fig.savefig(plots_path + '/temp_thermal.png')
-    plt.close(fig)
+    temps = ["AO", "AUX", "CPU", "GPU", "thermal", "PLL"]
+    for temp in temps:
+        key = f"Temp {temp}"
+        if key in df:
+            temp_values = df[key]
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            ax.set_title(f"{temp} Temperature")
+            ax.set_xlabel("Time")
+            ax.set_ylabel("Temperature (Celcius)Z")
+            ax.plot(np.arange(len(temp_values)), temp_values)
+            fig.savefig(plots_path + '/temp_ao.png')
+            fig.savefig(f"{plots_path}/{key.lower().replace(' ', '_')}")
+            plt.close(fig)
 
     # Current Power
     power_cur = df["power cur"]
@@ -156,41 +133,4 @@ if __name__ == "__main__":
     ax.plot(np.arange(len(power_avg)), power_avg)
     fig.savefig(plots_path + '/power_avg.png')
     plt.close(fig)
-
-    # ----------------------------------------
-    # Mean stats
-    # ----------------------------------------
-    numerical_df = df[[
-        "CPU1",
-        "CPU2",
-        "CPU3",
-        "CPU4",
-        "GPU",
-        "RAM",
-        "EMC",
-        "IRAM",
-        "SWAP",
-        "APE",
-        "Temp AO",
-        "Temp CPU",
-        "Temp GPU",
-        "Temp PLL",
-        "Temp thermal",
-        "power cur",
-        "power avg"
-    ]]
-    means_df = numerical_df.mean(axis = 0)
-    means_df.to_csv(os.path.join(results_path, "mean.csv"), sep=',')
-
-
-
-
-
-
-
-
-
-
-
-
 

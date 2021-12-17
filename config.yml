@@ -5,15 +5,15 @@ model:
         path: "./models/model.onnx"
 
 images:
-    type: ".bmp"
+    type: ".png"
     tile:
-        width: 538
-        height: 538
+        width: 224
+        height: 224
 
 inference:
     execution_time: 3600 # Running time of experiment (seconds)
-    max_temperature: 100 # Celcius
-    intervals: 60 # Analysis every X seconds
+    max_temperature: 65 # Celcius
+    intervals: 5 # Analysis every X seconds
 
 results:
     path: "./results" # Where results will be saved

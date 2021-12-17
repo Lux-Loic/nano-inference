@@ -1,5 +1,6 @@
 from jtop import jtop, JtopException
 import logging
+import os
 import time
 
 def load_logger(logger_path):
@@ -22,7 +23,7 @@ logger = load_logger("stats.log")
 if __name__ == "__main__":
     jetson = jtop()
     jetson.start()
-    
+
     LOGGING_TIME = 30
     EXECUTION_TIME = 3600
 
