@@ -2,21 +2,22 @@ model:
     torch:
         path: "./models/model.pth"
     onnx:
-        path: "./models/model.onnx"
+        path: "models/SSD_MobileNetV1/model.onnx"
 
 images:
     type: ".png"
     tile:
-        width: 224
-        height: 224
+        width: 300
+        height: 300
 
 inference:
-    execution_time: 3600 # Running time of experiment (seconds)
+    execution_time: 120 # Running time of experiment (seconds)
     max_temperature: 65 # Celcius
     intervals: 5 # Analysis every X seconds
 
 results:
     path: "./results" # Where results will be saved
+    logging_time: 30
 
 ftp:
     host: "10.3.141.1"

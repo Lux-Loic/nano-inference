@@ -25,7 +25,7 @@ if __name__ == "__main__":
     # ----------------------------------------
     # Configuration
     # ----------------------------------------
-    config = load_config("./config.yml")  
+    config = load_config("./config.yml")
 
     # ----------------------------------------
     # Results
@@ -45,9 +45,9 @@ if __name__ == "__main__":
     # ----------------------------------------
     # Load model
     # ----------------------------------------
-    onnx_model = onnx.load("models/model.onnx")
+    onnx_model = onnx.load(config["model"]["onnx"]["path"])
     onnx.checker.check_model(onnx_model)
-    ort_session = onnxruntime.InferenceSession("models/model.onnx")
+    ort_session = onnxruntime.InferenceSession(config["model"]["onnx"]["path"])
     print("Model loaded on the " + onnxruntime.get_device())
     logger.info("Model loaded on the " + onnxruntime.get_device())
 
@@ -61,8 +61,6 @@ if __name__ == "__main__":
 
     print("Start Analyzing")
     logger.info("Start Analyzing")
-
-    time.sleep(30)
 
     while running:
         # If Nano gets too hot
@@ -121,8 +119,8 @@ if __name__ == "__main__":
             del ort_inputs
 
             # Save result
-            if len(ort_outs[0]) > 0:
-                results[count] = format_results(ort_outs)
+            '''if len(ort_outs[0]) > 0:
+                results[count] = format_results(ort_outs)'''
 
             del ort_outs
 
@@ -130,13 +128,13 @@ if __name__ == "__main__":
             count += 1
 
         # Save predictions
-        pred_path = os.path.join(
+        '''pred_path = os.path.join(
             os.path.join(config["results"]["path"], "predictions"),
             file_path.split("/")[-1].replace(config["images"]["type"], ".json")
         )
         print(f"Save results to {pred_path}")
         with open(pred_path, 'w') as fp:
-            json.dump(results, fp)
+            json.dump(results, fp)'''
 
         times.append(time.time() - iteration_start_time)
         print("%s seconds" % (time.time() - iteration_start_time))

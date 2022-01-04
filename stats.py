@@ -2,6 +2,7 @@ from jtop import jtop, JtopException
 import logging
 import os
 import time
+from utils import load_config
 
 def load_logger(logger_path):
     # create logger with 'spam_application'
@@ -21,11 +22,12 @@ def load_logger(logger_path):
 logger = load_logger("stats.log")
 
 if __name__ == "__main__":
+    # ----------------------------------------
+    # Configuration
+    # ----------------------------------------
+    config = load_config("./config.yml")
     jetson = jtop()
     jetson.start()
-
-    LOGGING_TIME = 30
-    EXECUTION_TIME = 3600
 
     start_time = time.time()
 
@@ -33,8 +35,8 @@ if __name__ == "__main__":
         # Make csv file and setup csv
             stats = jetson.stats
             # Start loop
-            while jetson.ok() and (time.time() - start_time) < EXECUTION_TIME:
-                time.sleep(LOGGING_TIME)
+            while jetson.ok() and (time.time() - start_time) < config["inference"]["execution_time"]:
+                time.sleep(config["results"]["logging_time"])
                 stats = jetson.stats
                 # Log
                 print("Log at {time}".format(time=stats['time']))
