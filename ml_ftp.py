@@ -7,12 +7,8 @@ from jtop import jtop
 import logging
 import numpy as np
 import os
-import pandas as pd
 from PIL import Image
-import sys
 import time
-import torch
-from torchvision import transforms, models
 import yaml
 
 
@@ -168,24 +164,21 @@ if __name__ == "__main__":
         os.makedirs(predictions_path)
 
     # ----------------------------------------
+    # Load model
+    # ----------------------------------------
+    onnx_model = onnx.load(config["model"]["onnx"]["path"])
+    onnx.checker.check_model(onnx_model)
+    ort_session = onnxruntime.InferenceSession(config["model"]["onnx"]["path"])
+    print("Model loaded on the " + onnxruntime.get_device())
+    logger.info("Model loaded on the " + onnxruntime.get_device())
+
+    # ----------------------------------------
     # Jetson Nano
     # ----------------------------------------
     jetson = jtop()
     jetson.start()
 
     print("----- Lux Ship Detection -----")
-    # Paths
-    model_path = "./models/model.pth"
-
-    # Load model
-    log(logger, "Loading model...")
-    model = load_model(config["model"]["torch"]["path"])
-    # Send model to device
-    model.eval().cuda()
-    log(logger, "Model Loaded")
-
-    # Clear Memory
-    torch.cuda.empty_cache()
 
     # Keep track of time
     initial_time = time.time()
@@ -197,66 +190,98 @@ if __name__ == "__main__":
     while running:
         # If Nano gets too hot
         heat_check(jetson, config["inference"]["max_temperature"])
-        # For analysis purpose, remove in production
+
         # Limits execution time
+        # For analysis purpose, remove in production
         if (time.time() - initial_time) > config["inference"]["execution_time"]:
             running = False
-        if (end_time - start_time) >= config["inference"]["intervals"]:
-            # Clear Memory
-            torch.cuda.empty_cache()
-            # Retrieve files
-            ftp = connect_ftp(
-                config["ftp"]["host"], config["ftp"]["username"], config["ftp"]["password"])
-            log(logger, "Connected to FTP")
-            files = ftp.nlst()
-            files.sort()
-            file_path = files[-1]
-            del files
-            log(logger, f"Retrieving {file_path}")
-            # Read image
-            with open(file_path, "wb") as file:
-                flo = BytesIO()
-                ftp.retrbinary(f"RETR {file_path}", flo.write)
-                flo.seek(0)
-                image = Image.open(flo).convert("RGB")
-                ftp.quit()
-                del ftp
-                del flo
-                # Get image
-                batch = get_image(
-                    image, config["images"]["tile"]["width"], config["images"]["tile"]["height"])
-                del image
-                # Flatten patches
-                batch = batch.contiguous().view((batch.size(0) * batch.size(1)),
-                                                batch.size(2), batch.size(3), batch.size(4))
-                # Send to GPU
-                batch = batch.cuda()
-                # Loop all tiles
-                log(logger, "Analyzing image...")
-                count = 1
-                for image in batch:
-                    print(count)
-                    # Prediction
-                    prediction = model(image.unsqueeze(0))
-                    # Save prediction to file
-                    file_name = file_path.split(
-                        '/')[-1].replace(config["images"]["type"], f"_{count}.pth")
-                    torch.save(prediction[0], config["results"]
-                               ["path"] + "/predictions/" + file_name)
-                    # Clear Memory
-                    del prediction
-                    del file_name
-                    torch.cuda.empty_cache()
-                    # Increment count
-                    count += 1
-                # Clear Memory
-                del batch
-                del count
-                del file_path
-                # Save Prediction
-                log(logger, "Prediction saved", console=False)
-                # Reset timer
-                start_time = time.time()
+            break
 
-        # Set current time
-        end_time = time.time()
+        # Respect interval limit
+        print(f"Waiting {config['inference']['intervals']} seconds")
+        time.sleep(config["inference"]["intervals"])
+
+        # Retrieve files
+        ftp = connect_ftp(
+            config["ftp"]["host"], config["ftp"]["username"], config["ftp"]["password"])
+        log(logger, "Connected to FTP")
+        files = ftp.nlst()
+        files.sort()
+        file_path = files[-1]
+        del files
+        log(logger, f"Retrieving {file_path}")
+        # Read image
+        with open(file_path, "wb") as file:
+            flo = BytesIO()
+            ftp.retrbinary(f"RETR {file_path}", flo.write)
+            flo.seek(0)
+            image = Image.open(flo).convert("RGB")
+            ftp.quit()
+            del ftp
+            del flo
+
+            # Tile image
+            img_size = image.size
+            tile_size = (3, config["images"]["tile"]["width"], config["images"]["tile"]["height"])
+            tile_locations = tiles_location_gen(img_size, tile_size[1:], 0)
+
+            # Loop tiles
+            results = {}
+            count = 0
+            for tile_location in tile_locations:
+                # To numpy float array
+                tile = np.asarray(image.crop(tile_location), dtype=np.float32)
+                # Reshape to put num. channels first
+                tile = np.transpose(tile, (2, 0, 1))
+                
+                # Pad image if too small
+                if not tile.shape == tile_size:
+                    zeros = np.zeros(tile_size, dtype=np.float32)
+                    zeros[:, :tile.shape[1], :tile.shape[2]] = tile
+                    tile = zeros
+                    
+                # Add dimension for 'batch size' dimension
+                tile = np.expand_dims(tile, axis=0)
+
+                # Compute
+                ort_inputs = {ort_session.get_inputs()[0].name: tile}
+                ort_outs = ort_session.run(None, ort_inputs)
+
+                del ort_inputs
+
+                # Save result
+                if len(ort_outs[0]) > 0:
+                    results[count] = format_results(ort_outs)
+
+                del ort_outs
+
+                # Increment
+                count += 1
+
+            # Save predictions
+            pred_path = os.path.join(
+                os.path.join(config["results"]["path"], "predictions"),
+                file_path.split("/")[-1].replace(config["images"]["type"], ".json")
+            )
+            print(f"Save results to {pred_path}")
+            with open(pred_path, 'w') as fp:
+                json.dump(results, fp)
+
+            del pred_path
+            del results
+
+            times.append(time.time() - iteration_start_time)
+            print("%s seconds" % (time.time() - iteration_start_time))
+
+    # Set current time
+    end_time = time.time()
+
+    # Save stats
+    np.savetxt(os.path.join(config["results"]["path"], "times.txt"), times, delimiter=',')
+    if os.path.isfile("logs.log"):
+        copyfile("logs.log", os.path.join(config["results"]["path"], "logs.log"))
+    if os.path.isfile("stats.log"):
+        copyfile("stats.log", os.path.join(config["results"]["path"], "stats.log"))
+    if os.path.isfile("config.yml"):
+        copyfile("config.yml", os.path.join(config["results"]["path"], "config.yml"))    
+

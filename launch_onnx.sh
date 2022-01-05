@@ -1,5 +1,5 @@
 #!/bin/bash
-export OPENBLAS_CORETYPE=ARMV8
+#export OPENBLAS_CORETYPE=ARMV8
 rm logs.log
 rm stats.log
 rm -rf results

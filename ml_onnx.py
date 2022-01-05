@@ -134,7 +134,10 @@ if __name__ == "__main__":
         )
         print(f"Save results to {pred_path}")
         with open(pred_path, 'w') as fp:
-            json.dump(results, fp)'''
+            json.dump(results, fp)
+
+        del pred_path
+        del results'''
 
         times.append(time.time() - iteration_start_time)
         print("%s seconds" % (time.time() - iteration_start_time))
@@ -144,6 +147,10 @@ if __name__ == "__main__":
 
     # Save stats
     np.savetxt(os.path.join(config["results"]["path"], "times.txt"), times, delimiter=',')
-    copyfile("stats.log", os.path.join(config["results"]["path"], "stats.log"))
-    copyfile("config.yml", os.path.join(config["results"]["path"], "config.yml"))
+    if os.path.isfile("logs.log"):
+        copyfile("logs.log", os.path.join(config["results"]["path"], "logs.log"))
+    if os.path.isfile("stats.log"):
+        copyfile("stats.log", os.path.join(config["results"]["path"], "stats.log"))
+    if os.path.isfile("config.yml"):
+        copyfile("config.yml", os.path.join(config["results"]["path"], "config.yml"))
 
